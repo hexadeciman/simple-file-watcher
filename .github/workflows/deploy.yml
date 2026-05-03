@@ -1,0 +1,69 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOTNET_VERSION: 10.0.x
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore FileStreamer.sln
+
+      - name: Build
+        run: dotnet build FileStreamer.sln --configuration Release --no-restore
+
+      - name: Set Docker image name
+        run: |
+          IMAGE_URL="ghcr.io/${GITHUB_REPOSITORY}:${IMAGE_TAG}"
+          echo "IMAGE_URL=${IMAGE_URL,,}" >> "$GITHUB_ENV"
+          IMAGE_LATEST="ghcr.io/${GITHUB_REPOSITORY}:latest"
+          echo "IMAGE_LATEST=${IMAGE_LATEST,,}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_URL }}
+            ${{ env.IMAGE_LATEST }}
+
+      - name: Deploy to CapRover
+        uses: caprover/deploy-from-github@v1.1.2
+        with:
+          server: ${{ secrets.CAPROVER_SERVER }}
+          app: ${{ secrets.CAPROVER_APP }}
+          token: ${{ secrets.CAPROVER_APP_TOKEN }}
+          image: ${{ env.IMAGE_URL }}

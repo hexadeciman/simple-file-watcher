@@ -112,6 +112,61 @@ CONTAINER_JSON_DIR=/json-source
 JSON_FILE_PATH=/json-source/current.json
 ```
 
+## CapRover Deployment
+
+This repo includes a CapRover `captain-definition`:
+
+```json
+{
+  "schemaVersion": 2,
+  "dockerfilePath": "./Dockerfile"
+}
+```
+
+GitHub Actions builds the Docker image in GitHub, pushes it to GitHub Container Registry, then asks CapRover to deploy that image. This keeps image builds off your server.
+
+### CapRover App Setup
+
+Create a CapRover app named `simple-file-watcher`, or use your preferred app name and set the same value in the GitHub secret `CAPROVER_APP`.
+
+In the CapRover app settings, configure these environment variables:
+
+```bash
+ASPNETCORE_URLS=http://+:8080
+JsonFile__Path=/data/data.json
+Supabase__Url=https://yourproject.supabase.co
+Supabase__AllowedUserId=YOUR-SUPABASE-USER-ID
+Supabase__Audience=authenticated
+```
+
+Configure persistent storage or a host path mount so the JSON file exists inside the app container at the same path used by `JsonFile__Path`. For example, mount the host/export directory to `/data` and make sure `/data/data.json` exists.
+
+The container listens on port `8080`, so configure the CapRover app container HTTP port as `8080`.
+
+### GitHub Actions Setup
+
+The workflow is in `.github/workflows/deploy.yml` and runs on pushes to `main` or manual `workflow_dispatch`.
+
+Add these repository secrets in GitHub:
+
+```bash
+CAPROVER_SERVER=https://captain.apps.your-domain.com
+CAPROVER_APP=simple-file-watcher
+CAPROVER_APP_TOKEN=your-caprover-app-token
+```
+
+To get `CAPROVER_APP_TOKEN`, open the app in CapRover, go to the Deployment tab, enable the app token, and copy it.
+
+The workflow pushes images to GitHub Container Registry using `GITHUB_TOKEN`. In GitHub, make sure Actions has package write permission:
+
+- Repository Settings
+- Actions
+- General
+- Workflow permissions
+- Select `Read and write permissions`
+
+If the CapRover app cannot pull from GHCR, either make the package public or configure `ghcr.io` as a private registry in CapRover with credentials that can read the package.
+
 ## REST Usage
 
 ```bash
