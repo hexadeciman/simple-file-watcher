@@ -200,6 +200,7 @@ Behavior:
 {"error":"..."}
 ```
 
+
 ## Local Development
 
 For local non-Docker runs, create `appsettings.Local.json`. The current local file mirrors `.env`, but is ignored by git:
